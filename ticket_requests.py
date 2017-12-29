@@ -26,7 +26,10 @@ class Ticket(object):
         for item_class in soup.find_all(class_="gs_2t"):
             data = {}
             item = item_class.find('a')
-            data['title'] = str(i) + ' ' + item.get('title')
+            title = item.text
+            if title.find('星梦剧院') == -1:  # or if '星梦剧院' in title
+                continue
+            data['title'] = str(i) + ' ' + title
             data['href'] = item.get('href')
             self.items.append(data)
             i += 1
@@ -50,7 +53,7 @@ class Ticket(object):
             rm_minutes = minutes % 60
             rm_secends = secends % 60
 
-            if (rm_secends != rm_secends_last):
+            if (rm_secends != rm_secends_last and rm_secends_last != 60):
                 print(str(rm_hours) + '时' + str(rm_minutes) + '分' + str(rm_secends) + '秒 开售')
 
     def fighting(self, postData):
@@ -63,8 +66,8 @@ class Ticket(object):
             print('order defeat!')
 
     def ragman(self, id, postData):
-        payload = {'id': id, 'brand_id': self.brand_id}
-        url_amount = urljoin(url_shop, 'tickets/saleList')
+        payload = {'brand_id': self.brand_id, 'team_type': '-1', 'date_type': '0'}
+        url_amount = urljoin(url_shop, 'Home/IndexTickets')
         type = int(self.seattype) - 1
         while 1:
             try:
@@ -73,7 +76,8 @@ class Ticket(object):
                 traceback.print_exc()
                 continue
             # res.content类型为bytes, .decode('utf-8')之后为str
-            if json.loads(res.content.decode('utf-8'))[type]['amount']:
+            index_tickets = json.loads(res.content.decode('utf-8'))
+            if index_tickets[id]['tickets_sales'][type]['amount']:
                 url_order = urljoin(url_shop, 'TOrder/add')
                 resp = self.session.post(url_order, data=postData, proxies=proxies)
                 if resp.status_code == 200:
@@ -104,18 +108,18 @@ class Ticket(object):
         #等待放票
         self.waiting(self.start_time)
         #抢票
-        self.fighting(postData=postData)
+        # self.fighting(postData=postData)
         #等待捡票
         self.waiting(self.start_time + 1200)
         #开始捡票
-        self.ragman(id=ticketcode, postData=postData)
+        self.ragman(id=id, postData=postData)
 
 if __name__ == '__main__':
     #48票务页面
     url_ticket = 'https://shop.48.cn/tickets?brand_id=2'
     url_login = 'http://vip.48.cn/Home/Login/index.html'
     url_shop = 'https://shop.48.cn'
-    start_time = '2017-12-27 17:00:00'
+    start_time = '2017-12-26 20:00:00'
     start_time = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timestamp()
 
     user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36'
