@@ -42,7 +42,7 @@ class Ticket(object):
         while (youtime > 0):
             rm_secends_last = rm_secends
             now = int(datetime.now().timestamp() * 1000) #ms
-            start = start_time * 1000        #ms
+            start = start_time         #ms
             youtime = start - now
             secends = int(youtime / 1000)
             minutes = int(secends / 60)
@@ -54,9 +54,16 @@ class Ticket(object):
             rm_secends = secends % 60
 
             if (rm_secends != rm_secends_last and rm_secends_last != 60):
-                print(str(rm_hours) + '时' + str(rm_minutes) + '分' + str(rm_secends) + '秒 开售')
+                print(str(rm_hours) + '时' + str(rm_minutes) + '分' + str(rm_secends) + '秒 开始')
 
-    def fighting(self, postData):
+    def fighting(self, difference_time, postData):
+        #抢票时间已过，转为捡票
+        now = int(datetime.now().timestamp() * 1000)
+        if now > self.start_time:
+            return
+        #激动的等待时间
+        self.waiting(self.start_time + difference_time)
+
         #发送一次
         url_order = urljoin(url_shop, 'TOrder/add')
         res = self.session.post(url_order, data=postData, proxies=proxies)
@@ -66,6 +73,9 @@ class Ticket(object):
             print('order defeat!')
 
     def ragman(self, id, postData):
+        #等待捡票
+        self.waiting(self.start_time + 1200000) # 20min之后开始捡票
+
         payload = {'brand_id': self.brand_id, 'team_type': '-1', 'date_type': '0'}
         url_amount = urljoin(url_shop, 'Home/IndexTickets')
         type = int(self.seattype) - 1
@@ -76,7 +86,8 @@ class Ticket(object):
                 traceback.print_exc()
                 continue
             # res.content类型为bytes, .decode('utf-8')之后为str
-            index_tickets = json.loads(res.content.decode('utf-8'))
+            # index_tickets = json.loads(res.content.decode('utf-8'))
+            index_tickets = res.json()
             if index_tickets[id]['tickets_sales'][type]['amount']:
                 url_order = urljoin(url_shop, 'TOrder/add')
                 resp = self.session.post(url_order, data=postData, proxies=proxies)
@@ -105,12 +116,10 @@ class Ticket(object):
         postData = {'id':ticketcode, 'num':'1', 'seattype':self.seattype,
                     'brand_id':self.brand_id, 'r':'%.17f' %random.random(), 'choose_times_end':'-1'}
 
-        #等待放票
-        self.waiting(self.start_time)
         #抢票
-        # self.fighting(postData=postData)
-        #等待捡票
-        self.waiting(self.start_time + 1200)
+        difference_time = 1000  #1s延迟
+        self.fighting(difference_time, postData=postData)
+
         #开始捡票
         self.ragman(id=id, postData=postData)
 
@@ -119,8 +128,8 @@ if __name__ == '__main__':
     url_ticket = 'https://shop.48.cn/tickets?brand_id=2'
     url_login = 'http://vip.48.cn/Home/Login/index.html'
     url_shop = 'https://shop.48.cn'
-    start_time = '2017-12-26 20:00:00'
-    start_time = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timestamp()
+    start_time = '2018-01-02 20:00:00'
+    start_time = int(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').timestamp()*1000) # ms
 
     user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36'
     headers = {'User-Agent': user_agent}
@@ -136,7 +145,7 @@ if __name__ == '__main__':
     brand_id = url_ticket.split('=')[-1]
     ticket = Ticket(start_time, seattype, brand_id, cookies)
     ticket.query(url_ticket, headers, proxies)
-    ids = input('请选择购买序号：as: 0,1')
+    ids = input('请选择购买序号：as: 0,1\n')
     if ids is not None:
         ids = ids.split(',')  # str字符串
         for id in ids:
